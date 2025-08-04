@@ -211,7 +211,7 @@ const char* AuthManager_GetHWID() {
 }
 
 // Authentication interface
-void AuthManager_Login() {
+bool AuthManager_Login() {
     string username, password;
     cout << "Enter Username: ";
     cin >> username;
@@ -221,13 +221,10 @@ void AuthManager_Login() {
     bool userExists = AuthManager_CheckUserExists(username.c_str(), password.c_str(), g_ownerid.c_str());
     cout << (userExists ? "User exists." : "User doesn't exist.") << endl;
 
-    if (userExists) {
-        cout << "\nPerforming actions for existing user..." << endl;
-        // CODE HERE
-    }
+    return userExists;
 }
 
-void AuthManager_License() {
+bool AuthManager_License() {
     string license;
     cout << "Enter License: ";
     cin >> license;
@@ -237,13 +234,10 @@ void AuthManager_License() {
     bool licenseIsValid = AuthManager_CheckLicense(license.c_str(), hwid.c_str(), g_ownerid.c_str());
     cout << (licenseIsValid ? "License is valid." : "License is invalid.") << endl;
 
-    if (licenseIsValid) {
-        cout << "\nPerforming actions for valid license..." << endl;
-        // CODE HERE
-    }
+    return licenseIsValid;
 }
 
-void AuthManager_Register() {
+bool AuthManager_Register() {
     string email, username, password, license;
     cout << "Enter Email: ";
     cin >> email;
@@ -256,18 +250,12 @@ void AuthManager_Register() {
 
     if (!AuthManager_ValidateInput(email.c_str(), username.c_str(), password.c_str())) {
         cout << "Invalid input. Please check your email, username, and password and try again." << endl;
-        return;
+        return false;
     }
 
     string hwid = GetHWIDInternal();
 
     bool registrationSuccess = AuthManager_RegisterUser(email.c_str(), username.c_str(), password.c_str(), license.c_str(), hwid.c_str(), g_ownerid.c_str());
 
-    if (registrationSuccess) {
-        cout << "\nRegistration successful." << endl;
-        // CODE HERE
-    }
-    else {
-        cout << "\nError during registration." << endl;
-    }
+    return registrationSuccess;
 }
