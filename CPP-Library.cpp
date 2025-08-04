@@ -172,9 +172,8 @@ bool AuthManager_CheckLicense(const char* license, const char* hwid, const char*
     return statusCode == 204; // NoContent
 }
 
-bool AuthManager_RegisterUser(const char* email, const char* username, const char* password, const char* license, const char* hwid, const char* ownerId) {
+bool AuthManager_RegisterUser(const char* username, const char* password, const char* license, const char* hwid, const char* ownerId) {
     vector<pair<string, string>> data = {
-        {"email", email ? email : ""},
         {"username", username ? username : ""},
         {"password", password ? password : ""},
         {"license", license ? license : ""},
@@ -189,19 +188,16 @@ bool AuthManager_RegisterUser(const char* email, const char* username, const cha
 }
 
 // Utility functions
-bool AuthManager_ValidateInput(const char* email, const char* username, const char* password) {
-    if (!email || !username || !password) return false;
+bool AuthManager_ValidateInput(const char* username, const char* password) {
+    if (!username || !password) return false;
     
-    string emailStr(email);
     string usernameStr(username);
     string passwordStr(password);
     
     regex usernameRegex("^[a-zA-Z][a-zA-Z0-9_-]{2,15}$");
-    regex emailRegex("^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\\.[a-zA-Z0-9-.]+$");
     regex passwordRegex("^(?=.*[a-z])(?=.*[A-Z])(?=.*\\d)(?=.*[@$!%*?&])[A-Za-z\\d@$!%*?&]{8,}$");
 
     return regex_match(usernameStr, usernameRegex) && 
-           regex_match(emailStr, emailRegex) && 
            regex_match(passwordStr, passwordRegex);
 }
 
@@ -238,9 +234,7 @@ bool AuthManager_License() {
 }
 
 bool AuthManager_Register() {
-    string email, username, password, license;
-    cout << "Enter Email: ";
-    cin >> email;
+    string username, password, license;
     cout << "Enter Username: ";
     cin >> username;
     cout << "Enter Password: ";
@@ -248,14 +242,14 @@ bool AuthManager_Register() {
     cout << "Enter License: ";
     cin >> license;
 
-    if (!AuthManager_ValidateInput(email.c_str(), username.c_str(), password.c_str())) {
-        cout << "Invalid input. Please check your email, username, and password and try again." << endl;
+    if (!AuthManager_ValidateInput(username.c_str(), password.c_str())) {
+        cout << "Invalid input. Please check your username and password and try again." << endl;
         return false;
     }
 
     string hwid = GetHWIDInternal();
 
-    bool registrationSuccess = AuthManager_RegisterUser(email.c_str(), username.c_str(), password.c_str(), license.c_str(), hwid.c_str(), g_ownerid.c_str());
+    bool registrationSuccess = AuthManager_RegisterUser(username.c_str(), password.c_str(), license.c_str(), hwid.c_str(), g_ownerid.c_str());
 
     return registrationSuccess;
 }
