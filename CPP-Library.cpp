@@ -16,12 +16,12 @@
 
 using namespace std;
 
-static string g_app_name = "";
-static string g_ownerid = "";
-static string g_app_secret = "";
-static string g_server_host = "127.0.0.1";
+static string g_app_name = ""; // Leave it blank
+static string g_ownerid = ""; // Leave it blank
+static string g_app_secret = ""; // Leave it blank
+static string g_server_host = "127.0.0.1"; 
 static int g_server_port = 8080;
-static string g_hwid_cache = "";
+static string g_hwid_cache = ""; // Leave it blank
 static bool g_initialized = false;
 
 // Internal utility functions
