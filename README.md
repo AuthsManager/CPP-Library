@@ -95,7 +95,7 @@ The library communicates with an authentication server running on `localhost:808
 
 ## License
 
-This project is licensed under the terms specified in the LICENSE file.
+See the [LICENSE](LICENSE) file for more details.
 
 ## Contributing
 
