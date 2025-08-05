@@ -33,7 +33,7 @@ CPP-Library/
 ├── AuthManager.h           # Header file with function declarations
 ├── CPP-Library.cpp         # Main library implementation
 ├── framework.h             # Framework definitions
-├── pch.h/pch.cpp          # Precompiled headers
+└── pch.h/pch.cpp          # Precompiled headers
 ```
 
 ## Building the Library
