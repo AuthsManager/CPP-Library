@@ -132,12 +132,12 @@ static string GetHWIDInternal() {
 }
 
 // Configuration function
-void AuthManager_SetConfig(const char* appName, const char* ownerId, const char* appSecret, const char* serverHost, unsigned int serverPort) { // if local then removed unsigned
+void AuthManager_SetConfig(const char* appName, const char* ownerId, const char* appSecret) { 
     g_app_name = appName ? appName : "";
     g_ownerid = ownerId ? ownerId : "";
     g_app_secret = appSecret ? appSecret : "";
-    g_server_host = serverHost ? serverHost : "https://api.authmanager.xyz";
-    // g_server_port = serverPort; // if local then remove those comments
+    g_server_host = "https://api.authmanager.xyz";  
+    // g_server_port = "8080"; // if local then remove those comments
 }
 
 // Core authentication functions
