@@ -136,7 +136,7 @@ void AuthManager_SetConfig(const char* appName, const char* ownerId, const char*
     g_app_name = appName ? appName : "";
     g_ownerid = ownerId ? ownerId : "";
     g_app_secret = appSecret ? appSecret : "";
-    g_server_host = serverHost ? serverHost : "127.0.0.1";
+    g_server_host = serverHost ? serverHost : "https://api.authmanager.xyz";
     // g_server_port = serverPort; // if local then remove those comments
 }
 
