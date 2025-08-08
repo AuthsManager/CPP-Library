@@ -2,16 +2,13 @@
 #include "framework.h"
 #include "AuthManager.h"
 #include <string>
-#define _WINSOCK_DEPRECATED_NO_WARNINGS
 #include <vector>
 #include <iostream>
 #include <sstream>
 #include <regex>
-#include <winsock2.h>
-#include <ws2tcpip.h>
 #include <windows.h>
-#pragma comment(lib, "ws2_32.lib")
-#pragma comment(lib, "wininet.lib")
+#include <winhttp.h>
+#pragma comment(lib, "winhttp.lib")
 #pragma comment(lib, "wbemuuid.lib")
 
 using namespace std;
@@ -19,8 +16,8 @@ using namespace std;
 static string g_app_name = ""; // Leave it blank
 static string g_ownerid = ""; // Leave it blank
 static string g_app_secret = ""; // Leave it blank
-static string g_server_host = "127.0.0.1"; 
-static int g_server_port = 8080;
+static string g_server_host = "https://api.authmanager.xyz"; 
+// static int g_server_port = 8080;
 static string g_hwid_cache = ""; // Leave it blank
 static bool g_initialized = false;
 
@@ -36,56 +33,78 @@ static string CreateJsonString(const vector<pair<string, string>>& data) {
     return json.str();
 }
 
-static int SendHttpPost(const string& host, int port, const string& path, const string& jsonData) {
-    WSADATA wsaData;
-    if (WSAStartup(MAKEWORD(2, 2), &wsaData) != 0) {
+static int SendHttpPost(const string& url, const string& path, const string& jsonData) {
+    bool isHttps = (url.find("https://") == 0);
+    string host = url;
+    if (isHttps) {
+        host = host.substr(8); 
+    } else if (host.find("http://") == 0) {
+        host = host.substr(7); 
+    }
+    
+    int hostLen = MultiByteToWideChar(CP_UTF8, 0, host.c_str(), -1, NULL, 0);
+    wstring wHost(hostLen, 0);
+    MultiByteToWideChar(CP_UTF8, 0, host.c_str(), -1, &wHost[0], hostLen);
+    
+    int pathLen = MultiByteToWideChar(CP_UTF8, 0, path.c_str(), -1, NULL, 0);
+    wstring wPath(pathLen, 0);
+    MultiByteToWideChar(CP_UTF8, 0, path.c_str(), -1, &wPath[0], pathLen);
+
+    HINTERNET hSession = WinHttpOpen(L"AuthManager/1.0", 
+                                     WINHTTP_ACCESS_TYPE_DEFAULT_PROXY,
+                                     WINHTTP_NO_PROXY_NAME, 
+                                     WINHTTP_NO_PROXY_BYPASS, 0);
+    if (!hSession) return -1;
+
+    HINTERNET hConnect = WinHttpConnect(hSession, wHost.c_str(), 
+                                        isHttps ? INTERNET_DEFAULT_HTTPS_PORT : INTERNET_DEFAULT_HTTP_PORT, 0);
+    if (!hConnect) {
+        WinHttpCloseHandle(hSession);
         return -1;
     }
 
-    SOCKET sock = socket(AF_INET, SOCK_STREAM, 0);
-    if (sock == INVALID_SOCKET) {
-        WSACleanup();
+    DWORD flags = isHttps ? WINHTTP_FLAG_SECURE : 0;
+    HINTERNET hRequest = WinHttpOpenRequest(hConnect, L"POST", wPath.c_str(),
+                                            NULL, WINHTTP_NO_REFERER, 
+                                            WINHTTP_DEFAULT_ACCEPT_TYPES, flags);
+    if (!hRequest) {
+        WinHttpCloseHandle(hConnect);
+        WinHttpCloseHandle(hSession);
         return -1;
     }
 
-    sockaddr_in serverAddr;
-    serverAddr.sin_family = AF_INET;
-    serverAddr.sin_port = htons(port);
-    serverAddr.sin_addr.s_addr = inet_addr(host.c_str());
+    wstring headers = L"Content-Type: application/json\r\n";
+    WinHttpAddRequestHeaders(hRequest, headers.c_str(), -1, WINHTTP_ADDREQ_FLAG_ADD);
 
-    if (connect(sock, (sockaddr*)&serverAddr, sizeof(serverAddr)) == SOCKET_ERROR) {
-        closesocket(sock);
-        WSACleanup();
+    BOOL result = WinHttpSendRequest(hRequest, WINHTTP_NO_ADDITIONAL_HEADERS, 0,
+                                     (LPVOID)jsonData.c_str(), jsonData.length(), 
+                                     jsonData.length(), 0);
+    
+    if (!result) {
+        WinHttpCloseHandle(hRequest);
+        WinHttpCloseHandle(hConnect);
+        WinHttpCloseHandle(hSession);
         return -1;
     }
 
-    ostringstream request;
-    request << "POST " << path << " HTTP/1.1\r\n";
-    request << "Host: " << host << ":" << port << "\r\n";
-    request << "Content-Type: application/json\r\n";
-    request << "Content-Length: " << jsonData.length() << "\r\n";
-    request << "Connection: close\r\n";
-    request << "\r\n";
-    request << jsonData;
-
-    string requestStr = request.str();
-    send(sock, requestStr.c_str(), requestStr.length(), 0);
-
-    char buffer[1024];
-    int bytesReceived = recv(sock, buffer, sizeof(buffer) - 1, 0);
-    buffer[bytesReceived] = '\0';
-
-    closesocket(sock);
-    WSACleanup();
-
-    string response(buffer);
-    size_t statusPos = response.find(" ");
-    if (statusPos != string::npos) {
-        string statusCode = response.substr(statusPos + 1, 3);
-        return stoi(statusCode);
+    result = WinHttpReceiveResponse(hRequest, NULL);
+    if (!result) {
+        WinHttpCloseHandle(hRequest);
+        WinHttpCloseHandle(hConnect);
+        WinHttpCloseHandle(hSession);
+        return -1;
     }
 
-    return -1;
+    DWORD statusCode = 0;
+    DWORD statusCodeSize = sizeof(statusCode);
+    WinHttpQueryHeaders(hRequest, WINHTTP_QUERY_STATUS_CODE | WINHTTP_QUERY_FLAG_NUMBER,
+                        WINHTTP_HEADER_NAME_BY_INDEX, &statusCode, &statusCodeSize, WINHTTP_NO_HEADER_INDEX);
+
+    WinHttpCloseHandle(hRequest);
+    WinHttpCloseHandle(hConnect);
+    WinHttpCloseHandle(hSession);
+
+    return (int)statusCode;
 }
 
 static string GetHWIDInternal() {
@@ -113,12 +132,12 @@ static string GetHWIDInternal() {
 }
 
 // Configuration function
-void AuthManager_SetConfig(const char* appName, const char* ownerId, const char* appSecret, const char* serverHost, int serverPort) {
+void AuthManager_SetConfig(const char* appName, const char* ownerId, const char* appSecret, const char* serverHost, unsigned int serverPort) { // if local then removed unsigned
     g_app_name = appName ? appName : "";
     g_ownerid = ownerId ? ownerId : "";
     g_app_secret = appSecret ? appSecret : "";
     g_server_host = serverHost ? serverHost : "127.0.0.1";
-    g_server_port = serverPort;
+    // g_server_port = serverPort; // if local then remove those comments
 }
 
 // Core authentication functions
@@ -140,7 +159,7 @@ bool AuthManager_CheckAppExists(const char* appName, const char* ownerId, const 
     };
     
     string jsonData = CreateJsonString(data);
-    int statusCode = SendHttpPost(g_server_host, g_server_port, "/auth/initiate", jsonData);
+    int statusCode = SendHttpPost(g_server_host, "/auth/initiate", jsonData); // if local then add g_server_port
     
     g_initialized = (statusCode == 204);
     return g_initialized;
@@ -154,7 +173,7 @@ bool AuthManager_CheckUserExists(const char* username, const char* password, con
     };
     
     string jsonData = CreateJsonString(data);
-    int statusCode = SendHttpPost(g_server_host, g_server_port, "/auth/login", jsonData);
+    int statusCode = SendHttpPost(g_server_host, "/auth/login", jsonData); // if local then add g_server_port
     
     return statusCode == 204; // NoContent
 }
@@ -167,7 +186,7 @@ bool AuthManager_CheckLicense(const char* license, const char* hwid, const char*
     };
     
     string jsonData = CreateJsonString(data);
-    int statusCode = SendHttpPost(g_server_host, g_server_port, "/auth/login", jsonData);
+    int statusCode = SendHttpPost(g_server_host, "/auth/login", jsonData); // if local then add g_server_port
     
     return statusCode == 204; // NoContent
 }
@@ -182,7 +201,7 @@ bool AuthManager_RegisterUser(const char* username, const char* password, const 
     };
     
     string jsonData = CreateJsonString(data);
-    int statusCode = SendHttpPost(g_server_host, g_server_port, "/auth/register", jsonData);
+    int statusCode = SendHttpPost(g_server_host, "/auth/register", jsonData); // if local then add g_server_port
     
     return statusCode == 204; // NoContent
 }
